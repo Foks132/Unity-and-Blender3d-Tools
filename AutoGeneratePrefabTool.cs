@@ -39,11 +39,8 @@ public class AutoGeneratePrefabTool : MonoBehaviour
         if (System.IO.Directory.Exists(_path))
         {
             var instanceRoot = PrefabUtility.InstantiatePrefab(meshPath);
-
             var variantRoot = PrefabUtility.SaveAsPrefabAsset((GameObject)instanceRoot, $"{_path}/Variant.prefab");
-
             var allobject = new List<string>();
-
             Component[] meshes = variantRoot.GetComponentsInChildren<MeshFilter>();
 
             foreach (MeshFilter mesh in meshes)
@@ -51,13 +48,11 @@ public class AutoGeneratePrefabTool : MonoBehaviour
                 Transform objTransform = mesh.transform;
                 string objName = mesh.name;
 
-
                 if (objName.Contains(lod0Name) &
                     allobject.Find(x => x.Equals(objName.ToLower())) == null) //Поиск первой модели (LOD 0)
                 {
                     allobject.Add(objName.ToLower());
                     GameObject obj = new GameObject();
-
 
                     obj.transform.position = objTransform.position; //Задать позицию
                     obj.transform.rotation = objTransform.rotation; //Задать вращение
