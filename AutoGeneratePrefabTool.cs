@@ -131,6 +131,5 @@ public class AutoGeneratePrefabTool : MonoBehaviour
             System.IO.Directory.CreateDirectory(_path);
             Start();
         }
-        
     }
 }
