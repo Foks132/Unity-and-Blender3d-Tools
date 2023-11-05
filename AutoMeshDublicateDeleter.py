@@ -3,6 +3,9 @@ import bpy
 objects = bpy.context.selected_objects
 
 for item in objects:
+    item.data.name = item.name 
+
+for item in objects:
     if item.data.name.find('.') != -1:
         text = item.data.name.partition('.')
         item_name_no_point = text[0]
@@ -14,5 +17,5 @@ for item in objects:
                 huy = i
             
         item.data = bpy.data.meshes[huy]
-        
+
 bpy.ops.outliner.orphans_purge(do_local_ids=True, do_linked_ids=True, do_recursive=False)
