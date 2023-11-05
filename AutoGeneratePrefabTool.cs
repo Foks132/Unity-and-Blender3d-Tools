@@ -1,13 +1,7 @@
-﻿using JetBrains.Annotations;
-using System;
-using System.Collections;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using Unity.VisualScripting;
 using UnityEditor;
-using UnityEditor.VersionControl;
 using UnityEngine;
-using static UnityEditor.MaterialProperty;
 
 public class AutoGeneratePrefabTool : MonoBehaviour
 {
@@ -27,8 +21,12 @@ public class AutoGeneratePrefabTool : MonoBehaviour
     public string outputLod1Name = "Model_1";
     public string outputLod2Name = "Model_2";
     [Header("LodGroupSettings")]
+    [Range(1, 3)]
+    public int lodCount = 2;
     [Range(0.0f, 1f)]
-    public float lod1Transition = 0.49f;
+    public float lod1Transition = 0.4f;
+    [Range(0.0f, 1f)]
+    public float lod2Transition = 0.2f;
     [Range(0.0f, 0.1f)]
     public float culledTransition = 0.01f;
 
@@ -48,8 +46,7 @@ public class AutoGeneratePrefabTool : MonoBehaviour
                 Transform objTransform = mesh.transform;
                 string objName = mesh.name;
 
-                if (objName.Contains(lod0Name) &
-                    allobject.Find(x => x.Equals(objName.ToLower())) == null) //Поиск первой модели (LOD 0)
+                if (objName.Contains(lod0Name) & allobject.Find(x => x.Equals(objName.ToLower())) == null) //Поиск первой модели (LOD 0)
                 {
                     allobject.Add(objName.ToLower());
                     GameObject obj = new GameObject();
@@ -61,52 +58,41 @@ public class AutoGeneratePrefabTool : MonoBehaviour
                     obj.transform.localScale = objTransform.transform.localScale;
                     Instantiate(mesh, obj.transform, true).name = outputLod0Name; //Создать объект нулевой LOD 
 
-                    foreach (MeshFilter lod1 in meshes) //Найти модель первой LOD
+                    var objClip = obj.AddComponent<MeshCollider>();
+                    var objLodGroup = obj.AddComponent<LODGroup>();
+
+                    foreach (MeshFilter _mesh in meshes) 
                     {
-                        if (lod1.name.Contains(obj.name) & lod1.name.Contains(lod1Name))
+                        if (_mesh.name.Contains(obj.name) & _mesh.name.Contains(lod1Name)) //Модель первой LOD
                         {
-                            lod1.transform.localScale = new Vector3(1, 1, 1);
-                            Instantiate(lod1, mesh.transform.position, obj.transform.rotation, obj.transform).name = outputLod1Name; //Создать объект первой LOD 
+                            _mesh.transform.localScale = new Vector3(1, 1, 1);
+                            Instantiate(_mesh, mesh.transform.position, obj.transform.rotation, obj.transform).name = outputLod1Name; //Создать объект первой LOD 
+                        }
+
+                        if (_mesh.name.Contains(obj.name) & _mesh.name.Contains(lod2Name)) //Модель второй LOD
+                        {
+                            _mesh.transform.localScale = new Vector3(1, 1, 1);
+                            Instantiate(_mesh, mesh.transform.position, obj.transform.rotation, obj.transform).name = outputLod2Name; //Создать объект второй LOD 
+                        }
+
+                        if (_mesh.name.Contains(obj.name) & _mesh.name.Contains(coliderName)) //Collider для объекта
+                        {
+                            objClip.sharedMesh = _mesh.sharedMesh;
                         }
                     }
 
-                    foreach (MeshFilter lod2 in meshes) //Найти модель второй LOD
-                    {
-                        if (lod2.name.Contains(obj.name) & lod2.name.Contains(lod2Name)) 
-                        {
-                            lod2.transform.localScale = new Vector3(1, 1, 1);
-                            Instantiate(lod2, mesh.transform.position, obj.transform.rotation, obj.transform).name = outputLod2Name; //Создать объект второй LOD 
-                        }
-                    }
-
-                    var objClip = obj.AddComponent<MeshCollider>(); 
-                    foreach (MeshFilter clip in meshes) //Найти Collider для объекта
-                    {
-                        if (clip.name.Contains(obj.name) & clip.name.Contains(coliderName))
-                        {
-                            objClip.sharedMesh = clip.sharedMesh;
-                        }
-                    }
-
-                    if (objClip.sharedMesh == null) //Если Collider не найден
+                    if (objClip.sharedMesh == null) //Если Collider не найден зададим модель нулевой LOD
                     {
                         objClip.sharedMesh = mesh.sharedMesh;
                     }
 
-                    var variantObj = PrefabUtility.SaveAsPrefabAsset(obj, $"{_path}/{obj.name}.prefab"); //Создать Prefab объекта
-                    variantObj.transform.localScale = new Vector3(100, 100, 100); 
-                    variantObj.transform.position = new Vector3(0, 0, 0);
-                    variantObj.transform.rotation = Quaternion.identity;
-
-                    LODGroup lodGroup = variantObj.AddComponent<LODGroup>();
-                    LOD[] lods = new LOD[2];
-
-                    Renderer[] renderers = new Renderer[1];
+                    LOD[] lods = new LOD[lodCount];
                     for (int i = 0; i < lods.Length; i++) //Поиск LOD для установки в LOD Group
                     {
-                        if (variantObj.transform.Find($"{outputLodNameNoIndex}{i}") != null)
+                        Renderer[] renderers = new Renderer[1];
+                        if (objLodGroup.transform.Find($"{outputLodNameNoIndex}{i}") != null)
                         {
-                            renderers[0] = variantObj.transform.Find($"{outputLodNameNoIndex}{i}").gameObject.GetComponent<Renderer>();
+                            renderers[0] = objLodGroup.transform.Find($"{outputLodNameNoIndex}{i}").gameObject.GetComponent<Renderer>();
                             lods[i] = new LOD(1.0F / (i + 2), renderers);
                         }
                         else
@@ -116,9 +102,20 @@ public class AutoGeneratePrefabTool : MonoBehaviour
                     }
 
                     lods[0].screenRelativeTransitionHeight = lod1Transition;
-                    lods[1].screenRelativeTransitionHeight = culledTransition;
-                    lodGroup.SetLODs(lods);
-                    lodGroup.RecalculateBounds();
+                    if (lodCount == 3)
+                    {
+                        lods[1].screenRelativeTransitionHeight = lod2Transition;
+                    }
+                    lods[lods.Length-1].screenRelativeTransitionHeight = culledTransition;
+
+                    objLodGroup.SetLODs(lods);
+                    objLodGroup.RecalculateBounds();
+
+                    var variantObj = PrefabUtility.SaveAsPrefabAsset(obj, $"{_path}/{obj.name}.prefab"); //Создать Prefab объекта
+                    variantObj.transform.localScale = new Vector3(100, 100, 100); 
+                    variantObj.transform.position = new Vector3(0, 0, 0);
+                    variantObj.transform.rotation = Quaternion.identity;
+
                     Debug.Log(obj.name + " done!");
                 }
 
